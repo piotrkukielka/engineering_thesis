@@ -138,6 +138,32 @@ glimpse(data_krk)
 tmpkrk <- left_join(isotopes_Krk, garden_meteo_daily, by = "date_join")
 data_krk <- data_krk %>% add_column("rain [??] <ogrod>"= tmpkrk$daily_mean_temp)
 glimpse(data_krk)
+
+
+### add relative humidity (is it relative?)
+agh_rooftop_meteo_daily <- agh_rooftop_meteo %>%
+  collapse_by("daily") %>%
+  group_by(date) %>%
+  summarise(daily_mean_temp = mean(averageRelativeHumidity))
+garden_meteo[["AIRHUM"]] <- as.numeric(gsub(",", ".", garden_meteo[["AIRTEMP"]]))
+garden_meteo <- garden_meteo %>%
+  collapse_by("daily") %>%
+  group_by(date) %>%
+  summarise(daily_mean_temp = mean(AIRHUM))
+names(meteo_Krk)
+# no hum in other data sets?
+
+
+
+
+
+
+
+
+
+
+
+
 ### NOT WORKING !!!! ###
 #add amount of rain
 #names(meteo_Krk)
