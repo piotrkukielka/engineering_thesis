@@ -1,5 +1,4 @@
 rm(list = ls())
-library(rJava)
 library(lubridate)
 library(readxl)
 library(dplyr)
@@ -22,14 +21,16 @@ names(meteo_Krk)[3] <- "date"
 
 # clear dates in isotopes_Krk
 tmp1 <- suppressWarnings(as_date(as.numeric(as.character(isotopes_Krk[["date"]])), origin = "1899-12-30"))
-tmp2 <- as_date(isotopes_Krk[["date"]], format="%d.%m.%Y", tz="UTC")
+tmp2 <- as_date(isotopes_Krk[["date"]], format="%d.%m.%Y", tz="Europe/Warsaw")
 tmp1[is.na(tmp1)] <- tmp2[!is.na(tmp2)]
 isotopes_Krk[['date']] <- tmp1
 rm(tmp1, tmp2)
 
 # clean dates in both meteo
-meteo_KW$date <- as_datetime(as.character(meteo_KW$date), format="%Y%m%d%H%M", tz="UTC")
-meteo_Krk$date <- as_datetime(as.character(meteo_Krk$date), format="%Y%m%d%H%M", tz="UTC")
+meteo_KW$date <- as_datetime(as.character(meteo_KW$date), format="%Y%m%d%H%M", tz="GMT")
+meteo_Krk$date <- as_datetime(as.character(meteo_Krk$date), format="%Y%m%d%H%M", tz="GMT")
+meteo_Krk$date <- with_tz(meteo_Krk$date, tzone = "UTC")
+meteo_KW$date <- with_tz(meteo_KW$date, tzone = "UTC")
 
 # convert other data columns to POSIX
 isotopes_Krk$date <- as.POSIXct(isotopes_Krk$date)
@@ -38,6 +39,7 @@ agh_rooftop_meteo$date <- as.POSIXct(agh_rooftop_meteo$date, tz = "UTC")
 garden_meteo$date <- as.POSIXct(garden_meteo$date, tz = "UTC")
 meteo_KW$date <- as.POSIXct(meteo_KW$date)
 meteo_Krk$date <- as.POSIXct(meteo_Krk$date)
+
 
 # fargenheit to celsius in meteo data
 meteo_Krk[["TEMP"]] <- fahrenheit.to.celsius(meteo_Krk[["TEMP"]])
@@ -59,6 +61,15 @@ meteo_Krk_daily <- meteo_Krk %>%
   collapse_by("daily") %>%
   group_by(date) %>%
   summarise(daily_mean_temp = mean(TEMP))
+meteo_Krk_daily %>% 
+  collapse_by("daily") %>%
+  group_by(date) %>%
+  summarise()
+
+test <- as.POSIXct("29.10.2017", format="%d.%m.%Y")
+meteo_Krk_daily %>% filter(date>test)
+help("collapse_by")
+
 meteo_KW <- meteo_KW %>% as_tbl_time(date)
 meteo_KW_daily <- meteo_KW %>%
   collapse_by("daily") %>%
@@ -92,7 +103,12 @@ garden_meteo_daily$date_join <- garden_meteo_daily$date %>% as_date()
 data_krk <- isotopes_Krk
 data_kw <- isotopes_KW
 
+#tmpkrk
 # add temperature 
+#tmpkrk <- 
+#isotopes_Krk <- isotopes_Krk %>% select(-date)
+#meteo_Krk_daily <- meteo_Krk_daily %>% select(-date)
+
 tmpkrk <- left_join(isotopes_Krk, meteo_Krk_daily, by = "date_join")
 data_krk <- data_krk %>% add_column("temp [C] <balice>"= tmpkrk$daily_mean_temp)
 glimpse(data_krk)
@@ -146,18 +162,78 @@ agh_rooftop_meteo_daily <- agh_rooftop_meteo %>%
   group_by(date) %>%
   summarise(daily_mean_temp = mean(averageRelativeHumidity))
 garden_meteo[["AIRHUM"]] <- as.numeric(gsub(",", ".", garden_meteo[["AIRTEMP"]]))
-garden_meteo <- garden_meteo %>%
+garden_meteo_daily <- garden_meteo %>%
   collapse_by("daily") %>%
   group_by(date) %>%
   summarise(daily_mean_temp = mean(AIRHUM))
-names(meteo_Krk)
 # no hum in other data sets?
 
+# tak, to jest bardzo potrzebne
+agh_rooftop_meteo_daily$date_join <- agh_rooftop_meteo_daily$date %>% as_date()
+garden_meteo_daily$date_join <- garden_meteo_daily$date %>% as_date()
+
+tmpkrk <- left_join(isotopes_Krk, agh_rooftop_meteo_daily, by = "date_join")
+data_krk <- data_krk %>% add_column("rel. humidity [??] <dach>"= tmpkrk$daily_mean_temp)
+glimpse(data_krk)
+
+# wstawia NA, bo nie zaczyna pomiarow razem z izotopami
+tmpkrk <- left_join(isotopes_Krk, garden_meteo_daily, by = "date_join")
+data_krk <- data_krk %>% add_column("rel humidity [??] <ogrod>"= tmpkrk$daily_mean_temp)
+glimpse(data_krk)
 
 
+### atm. pressure
+# to z dachu jest normalne, ze strony mozna pobrac SLP
+agh_rooftop_meteo_daily <- agh_rooftop_meteo %>%
+  collapse_by("daily") %>%
+  group_by(date) %>%
+  summarise(daily_mean_temp = mean(averageAirPressure))
+# to chyba tez normalne, ale nie ma o tym info
+garden_meteo[["PRESSURE"]] <- as.numeric(gsub(",", ".", garden_meteo[["PRESSURE"]]))
+garden_meteo_daily <- garden_meteo %>%
+  collapse_by("daily") %>%
+  group_by(date) %>%
+  summarise(daily_mean_temp = mean(PRESSURE))
+# to jest normalne, a SLP jest tez w tej tabeli
+meteo_Krk$STP <- as.numeric(as.character(meteo_Krk$STP))
+meteo_Krk_daily <- meteo_Krk %>%
+  collapse_by("daily") %>%
+  group_by(date) %>%
+  summarise(daily_mean_temp = mean(STP, na.rm = TRUE))
+# to jest normalne, a SLP jest tez w tej tabeli
+meteo_KW$STP <- as.numeric(as.character(meteo_KW$STP))
+meteo_KW_daily <- meteo_KW %>%
+  collapse_by("daily") %>%
+  group_by(date) %>%
+  summarise(daily_mean_temp = mean(STP, na.rm = TRUE))
+meteo_KW_daily
+
+# tak, to jest bardzo potrzebne
+agh_rooftop_meteo_daily$date_join <- agh_rooftop_meteo_daily$date %>% as_date()
+garden_meteo_daily$date_join <- garden_meteo_daily$date %>% as_date()
+meteo_Krk_daily$date_join <- meteo_Krk_daily$date %>% as_date()
+meteo_KW_daily$date_join <- meteo_KW_daily$date %>% as_date()
+
+tmpkrk <- left_join(isotopes_Krk, agh_rooftop_meteo_daily, by = "date_join")
+data_krk <- data_krk %>% add_column("pressure [hPa] <dach>"= tmpkrk$daily_mean_temp)
+glimpse(data_krk)
+
+# wstawia NA, bo nie zaczyna pomiarow razem z izotopami
+tmpkrk <- left_join(isotopes_Krk, garden_meteo_daily, by = "date_join")
+data_krk <- data_krk %>% add_column("pressure [?Pa] <ogrod>"= tmpkrk$daily_mean_temp)
+glimpse(data_krk)
+
+tmpkrk <- left_join(isotopes_Krk, meteo_Krk_daily, by = "date_join")
+data_krk <- data_krk %>% add_column("pressure [hPa] <Balice>"= tmpkrk$daily_mean_temp)
+glimpse(data_krk)
+
+tmpkw <- left_join(isotopes_KW, meteo_KW_daily, by = "date_join")
+data_kw <- data_kw %>% add_column("pressure [hPa]"= tmpkw$daily_mean_temp)
+glimpse(data_kw)
 
 
-
+saveRDS(data_krk, "data/datakrk.rds")
+saveRDS(data_kw, "data/datakw.rds")
 
 
 
