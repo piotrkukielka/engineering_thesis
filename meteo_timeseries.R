@@ -35,8 +35,13 @@ rain_dach <- plot_meteo("rain [??] <dach>")
 rain_ogrod <- plot_meteo("rain [??] <ogrod>")
 
 # humidity
+hum_ogrod <- plot_meteo("rel. humidity [??] <ogrod>")
+hum_dach <- plot_meteo("rel. humidity [??] <dach>")
 
-datakrk$`temp [C] <ogrod>`
+# pressure
+press_dach <- plot_meteo("pressure [hPa] <dach>")
+press_ogrod <- plot_meteo("pressure [?Pa] <ogrod>")
+press_balice <-plot_meteo("pressure [hPa] <Balice>")
 
 
 # analogicznie zrobic dla wszystkich meteo

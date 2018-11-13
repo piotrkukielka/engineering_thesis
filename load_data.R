@@ -68,7 +68,6 @@ meteo_Krk_daily %>%
 
 test <- as.POSIXct("29.10.2017", format="%d.%m.%Y")
 meteo_Krk_daily %>% filter(date>test)
-help("collapse_by")
 
 meteo_KW <- meteo_KW %>% as_tbl_time(date)
 meteo_KW_daily <- meteo_KW %>%
@@ -231,11 +230,22 @@ tmpkw <- left_join(isotopes_KW, meteo_KW_daily, by = "date_join")
 data_kw <- data_kw %>% add_column("pressure [hPa]"= tmpkw$daily_mean_temp)
 glimpse(data_kw)
 
+### add d-excess for both
+data_krk$dexcess <- data_krk$d2H - 8*data_krk$d18O
+data_kw$dexcess <- data_kw$d2H - 8*data_kw$d18O
+
+### add Delta 17O
+lambda <- 0.528
+data_krk$DELTA17O <- data_krk$d17O -  lambda*data_krk$d18O
+data_kw$DELTA17O <- data_kw$d17O -  lambda*data_kw$d18O
+
 
 saveRDS(data_krk, "data/datakrk.rds")
 saveRDS(data_kw, "data/datakw.rds")
 
-
+saveRDS(agh_rooftop_meteo, "data/fullrooftop.rds")
+saveRDS(garden_meteo, "data/garden.rds")
+saveRDS(meteo_Krk, "data/meteokrk.rds")
 
 
 
