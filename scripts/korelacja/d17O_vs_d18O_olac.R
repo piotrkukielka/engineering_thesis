@@ -1,0 +1,12 @@
+rm(list = ls())
+library(lubridate)
+library(readxl)
+library(dplyr)
+library(tibbletime)
+library(weathermetrics)
+library(tidyverse)
+library(ggrepel)
+library(plotly)
+
+setwd("~/engineering_thesis/")
+data <- read_rds("data/isotope_data.rds")

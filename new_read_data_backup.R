@@ -5,8 +5,6 @@ library(dplyr)
 library(tibbletime)
 library(weathermetrics)
 library(tidyverse)
-setwd("~/engineering_thesis/")
-
 # load data files from "data" folder
 isotopes_KW = as_tibble(read_excel("data/data_isotopes.xlsx", sheet = 1))
 isotopes_Krk = as_tibble(read_excel("data/data_isotopes.xlsx", sheet = 2))
@@ -28,7 +26,7 @@ tmp1[is.na(tmp1)] <- tmp2[!is.na(tmp2)]
 isotopes_Krk[['date']] <- tmp1
 rm(tmp1, tmp2)
 
-# clear dates in both meteo
+# clean dates in both meteo
 kw_meteo$date <- as_datetime(as.character(kw_meteo$date), format="%Y%m%d%H%M", tz="GMT")
 balice_meteo$date <- as_datetime(as.character(balice_meteo$date), format="%Y%m%d%H%M", tz="GMT")
 kw_meteo$date <- with_tz(kw_meteo$date, tzone = "UTC")
@@ -102,91 +100,27 @@ garden_meteo_daily <- garden_meteo %>%
 glimpse(garden_meteo_daily)
 glimpse(garden_meteo)
 
-# agh_meteo
-agh_meteo_daily <- agh_meteo[,c("date", 
-                                "averageAirTemp",
-                                "averageDewPointTemperature",
-                                "averageRelativeHumidity",
-                                "averageAirPressure",
-                                "rainAccumulation")]
-colnames(agh_meteo_daily) <- c("date",
-                               "temp_agh",
-                               "dewp_agh",
-                               "hum_agh",
-                               "press_agh",
-                               "pcp_agh")
-
 ### add d-excess
 isotopes_Krk$dexcess <- isotopes_Krk$d2H - 8*isotopes_Krk$d18O
 isotopes_KW$dexcess <- isotopes_KW$d2H - 8*isotopes_KW$d18O
 
 ### add Delta 17O
 lambda <- 0.528
-isotopes_Krk$DELTA17O <- (log(isotopes_Krk$d17O/1000+1) -  lambda*log(isotopes_Krk$d18O/1000+1))*10^6
-isotopes_KW$DELTA17O <- (log(isotopes_KW$d17O/1000+1) -  lambda*log(isotopes_KW$d18O/1000+1))*10^6
+isotopes_Krk$DELTA17O <- isotopes_Krk$d17O -  lambda*isotopes_Krk$d18O
+isotopes_KW$DELTA17O <- isotopes_KW$d17O -  lambda*isotopes_KW$d18O
 
-### add u(Delta17O)
-isotopes_Krk[["u(DELTA17O)"]] <- sqrt((-lambda/(isotopes_Krk$d18O/1000+1)*isotopes_Krk[["u(d18O)"]]/1000)^2 +
-                                        (1/(isotopes_Krk$d17O/1000+1)*isotopes_Krk[["u(d17O)"]]/1000)^2)*10^6
-isotopes_KW[["u(DELTA17O)"]] <- sqrt((lambda/(isotopes_KW$d18O/1000+1)*isotopes_KW[["u(d18O)"]]/1000)^2 +
-                                        (1/(isotopes_KW$d17O/1000+1)*isotopes_KW[["u(d17O)"]]/1000)^2)*10^6
-# chwilowe!!!!
-isotopes_Krk$`u(DELTA17O)`[is.na(isotopes_Krk$`u(DELTA17O)`)]
-
-
-### add dprim18O
-isotopes_Krk$dprim18O <- log(isotopes_Krk$d18O/1000+1)*1000
-isotopes_KW$dprim18O <- log(isotopes_KW$d18O/1000+1)*1000
-
-### add dprim17O
-isotopes_Krk$dprim17O <- log(isotopes_Krk$d17O/1000+1)*1000
-isotopes_KW$dprim17O <- log(isotopes_KW$d17O/1000+1)*1000
-
-# add date_join columns
-isotopes_Krk$date_join <- isotopes_Krk$date %>% as_date()
-isotopes_KW$date_join <- isotopes_KW$date %>% as_date()
-agh_meteo_daily$date_join <- agh_meteo_daily$date %>% as_date()
-garden_meteo_daily$date_join <- garden_meteo_daily$date %>% as_date()
-kw_meteo_daily$date_join <- kw_meteo_daily$date %>% as_date()
-balice_meteo_daily$date_join <- balice_meteo_daily$date %>% as_date()
-
-# remove false data from garden_meteo_daily
-del <- which(garden_meteo_daily$temp_garden>20 & garden_meteo_daily$date<as_date("2018-01-01"))
-garden_meteo_daily[del, c("temp_garden", "dewp_garden", "hum_garden", "pcp_garden", "press_garden")] <- NA
 ### joining
 data <- merge(isotopes_KW, isotopes_Krk, all.x = T, all.y = T,
-                  by=c("date" = "date"), suffix=c("_kw", "_krk"))
+                  by=c("date" = "date"), suffix=c("_krk", "_kw"))
 data <- as_tbl_time(data, date)
 glimpse(data)
 saveRDS(data, "data/isotope_data.rds")
 
-data$date_join <- data$date %>% as_date()
-data_meteo <- merge(data, agh_meteo_daily, all.x = T, all.y = T,
-                  by=c("date_join" = "date_join"))
-data_meteo <- merge(data_meteo, balice_meteo_daily, all.x = T, all.y = T,
-                    by=c("date_join" = "date_join"))
-data_meteo <- merge(data_meteo, kw_meteo_daily, all.x = T, all.y = T,
-                    by=c("date_join" = "date_join"))
-data_meteo <- merge(data_meteo, garden_meteo_daily, all.x = T, all.y = T,
-                    by=c("date_join" = "date_join"))
-### UNSURE !!!!!!!!!
+data_meteo <- merge(data, agh_meteo, all.x = T, all.y = T,
+                  by=c("date" = "date"))
+data_meteo <- merge(data, balice_meteo_daily, all.x = T, all.y = T,
+                    by=c("date" = "date"))
 
-drops <- c("date.x","date.y")
-data_meteo <- data_meteo[ , !(names(data_meteo) %in% drops)]
-names(data_meteo)
-data_meteo[["date"]] <- data_meteo$date_join
+
+
 data_meteo <- as_tbl_time(data_meteo, date)
-
-saveRDS(data_meteo, "data/meteo_data_premodel.rds")
-
-### aggreggating to monthly
-glimpse(data)
-data_monthly <- data %>%
-  collapse_by("monthly") %>%
-  #group_by(date) %>%
-  group_by(date=floor_date(date, "month")) %>%
-  summarise_all(mean, na.rm=T)
-glimpse(data_monthly)
-
-saveRDS(data_monthly, "data/data_monthly.rds")
-
